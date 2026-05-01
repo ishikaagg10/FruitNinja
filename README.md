@@ -14,9 +14,7 @@ The codebase includes:
 How to Compile and Run:
 Ensure you have [Node.js](https://nodejs.org/) installed on your machine.
 1. Open your terminal and navigate to the root directory of this project (the folder containing `package.json`).
-2. Install the necessary build tools and dependencies by running:
-    npm install
-3. Start the local development server by running:
-    npm run dev
+2. Install the necessary build tools and dependencies by running: npm install
+3. Start the local development server by running: npm run dev
 Open your web browser and navigate to the local URL provided in the terminal output (typically http://localhost:5173).
-How to operate: Click or tap the start screen to begin. Click and drag (swipe) your mouse across the fruits to slice them and trigger the fracture simulation in real-time.
+How to play: Click or tap the start screen to begin. Click and drag (swipe) your mouse across the fruits to slice them and trigger the fracture simulation in real-time.
