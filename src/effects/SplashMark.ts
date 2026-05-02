@@ -1,8 +1,3 @@
-/**
- * SplashMark: a juice splat left on the cutting board when a fruit is sliced.
- * Drawn as several overlapping ellipses in the fruit's color.
- * Fades out over a few seconds and then is removed.
- */
 export class SplashMark {
     public life = 1;
     private decay: number;
@@ -14,9 +9,8 @@ export class SplashMark {
         public color: string,
         public radius: number,
     ) {
-        this.decay = 0.004 + Math.random() * 0.003; // lasts ~3-5 seconds
+        this.decay = 0.004 + Math.random() * 0.003;
 
-        // Generate random splash blobs
         const count = 4 + Math.floor(Math.random() * 4);
         this.blobs = [];
         for (let i = 0; i < count; i++) {

@@ -5,13 +5,9 @@ import { Vector2 } from "../math/Vector2";
 export type BananaType = 'frenzy' | 'freeze' | 'double';
 
 interface BananaConfig {
-    /** Primary glow color */
     color: string;
-    /** Inner / lighter glow */
     innerColor: string;
-    /** Aura color */
     auraColor: string;
-    /** Label shown when sliced */
     label: string;
 }
 
@@ -36,15 +32,6 @@ const BANANA_CONFIGS: Record<BananaType, BananaConfig> = {
     },
 };
 
-/**
- * SpecialBanana is a rare powerup shaped like a banana.
- * Built with the same soft-body particle/spring system but in
- * an elongated oval shape. Has a glowing aura effect.
- *
- *  - Blue (frenzy): spawns a burst of extra fruits
- *  - Ice blue (freeze): pauses the timer for 5 seconds
- *  - Electric green (double): doubles all points for 8 seconds
- */
 export class SpecialBanana {
     public particles: Particle[] = [];
     public springs: Spring[] = [];
@@ -53,7 +40,7 @@ export class SpecialBanana {
     public sliced = false;
     public bananaType: BananaType;
     public config: BananaConfig;
-    public readonly radius = 55; // used for hit detection
+    public readonly radius = 55;
 
     constructor(type: BananaType, cx: number, cy: number, vx: number, vy: number) {
         this.bananaType = type;
@@ -62,23 +49,19 @@ export class SpecialBanana {
         const stiffness = 0.5;
         const segments = 14;
 
-        // Center
         this.center = new Particle(cx, cy);
         this.particles.push(this.center);
 
-        // Elongated oval shape (banana-like) — wider horizontally
         for (let i = 0; i < segments; i++) {
             const angle = (i / segments) * Math.PI * 2;
-            const rx = 55; // horizontal radius
-            const ry = 26; // vertical radius (squished)
-            // Add a curve offset for banana shape
+            const rx = 55;
+            const ry = 26;
             const curveOffset = Math.sin(angle) * 12;
             const px = cx + Math.cos(angle) * rx;
             const py = cy + Math.sin(angle) * ry + curveOffset;
             this.particles.push(new Particle(px, py));
         }
 
-        // Springs
         for (let i = 0; i < segments; i++) {
             const cur = 1 + i;
             const nxt = 1 + ((i + 1) % segments);
@@ -86,7 +69,6 @@ export class SpecialBanana {
             this.springs.push(new Spring(this.particles[cur], this.center, stiffness));
         }
 
-        // Initial velocity
         for (const p of this.particles) {
             p.oldPos.x = p.pos.x - vx;
             p.oldPos.y = p.pos.y - vy;
@@ -121,7 +103,6 @@ export class SpecialBanana {
                 return true;
             }
         }
-        // Proximity fallback
         const center = this.getCenterPos();
         const d = this.pointToSegDist(center, start, end);
         if (d < this.radius * 0.85) {
@@ -149,7 +130,6 @@ export class SpecialBanana {
 
         ctx.save();
 
-        // Pulsing aura glow
         const auraPulse = 0.7 + Math.sin(t) * 0.3;
         const auraR = this.radius * (1.6 + Math.sin(t * 1.3) * 0.2);
         const auraGrad = ctx.createRadialGradient(
@@ -165,7 +145,6 @@ export class SpecialBanana {
         ctx.fill();
         ctx.globalAlpha = 1;
 
-        // Body — smooth Catmull-Rom outline
         if (perimeter.length >= 3) {
             ctx.beginPath();
             const n = perimeter.length;
@@ -183,7 +162,6 @@ export class SpecialBanana {
             }
             ctx.closePath();
 
-            // Gradient fill
             const bodyGrad = ctx.createRadialGradient(
                 center.x - 8, center.y - 5, 2,
                 center.x, center.y, this.radius * 1.1,
@@ -194,7 +172,6 @@ export class SpecialBanana {
             ctx.fillStyle = bodyGrad;
             ctx.fill();
 
-            // Outline glow
             ctx.strokeStyle = cfg.innerColor;
             ctx.lineWidth = 2;
             ctx.globalAlpha = 0.6;
@@ -202,7 +179,6 @@ export class SpecialBanana {
             ctx.globalAlpha = 1;
         }
 
-        // Specular highlight
         const hlX = center.x - 10;
         const hlY = center.y - 6;
         const hlGrad = ctx.createRadialGradient(hlX, hlY, 0, hlX, hlY, 14);
@@ -213,7 +189,6 @@ export class SpecialBanana {
         ctx.arc(hlX, hlY, 14, 0, Math.PI * 2);
         ctx.fill();
 
-        // Small icon/symbol in center
         ctx.font = 'bold 20px sans-serif';
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';

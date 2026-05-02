@@ -3,17 +3,6 @@ import { Spring } from "../physics/Spring";
 import { Vector2 } from "../math/Vector2";
 import type { FruitType } from "./FruitType";
 
-/**
- * A Fruit is a circular soft-body object built from a ring of perimeter
- * particles connected by springs to each other and to a central particle.
- *
- * Slicing works by detecting line-segment intersections between the swipe
- * and every spring; intersected springs are removed, causing the soft body
- * to fracture. This is a simplified form of peridynamics-style fracture:
- * bonds (springs) that are "cut" by an external force are permanently
- * destroyed, and the remaining connected components drift apart under
- * gravity.
- */
 export class Fruit {
     public particles: Particle[] = [];
     public springs: Spring[] = [];
@@ -34,11 +23,9 @@ export class Fruit {
         const { radius, segments } = type;
         const stiffness = 0.5;
 
-        // Center particle
         this.center = new Particle(cx, cy);
         this.particles.push(this.center);
 
-        // Perimeter particles arranged in a circle
         for (let i = 0; i < segments; i++) {
             const angle = (i / segments) * Math.PI * 2;
             const px = cx + Math.cos(angle) * radius;
@@ -46,7 +33,6 @@ export class Fruit {
             this.particles.push(new Particle(px, py));
         }
 
-        // Springs: perimeter ring + spoke springs to center
         for (let i = 0; i < segments; i++) {
             const cur = 1 + i;
             const nxt = 1 + ((i + 1) % segments);
@@ -55,15 +41,12 @@ export class Fruit {
         }
         this.initialSpringCount = this.springs.length;
 
-        // Apply initial velocity using Verlet integration:
-        // velocity = pos - oldPos, so oldPos = pos - velocity
         for (const p of this.particles) {
             p.oldPos.x = p.pos.x - vx;
             p.oldPos.y = p.pos.y - vy;
         }
     }
 
-    /** Average position of all particles (approximate center of mass). */
     getCenterPos(): Vector2 {
         let sx = 0, sy = 0;
         for (const p of this.particles) {
@@ -73,9 +56,7 @@ export class Fruit {
         return new Vector2(sx / this.particles.length, sy / this.particles.length);
     }
 
-    /** Verlet integration step + spring constraint solving. */
     update(gravity: Vector2, friction: number): void {
-        // Verlet integration
         for (const p of this.particles) {
             if (p.pinned) continue;
             const vx = (p.pos.x - p.oldPos.x) * friction;
@@ -86,17 +67,11 @@ export class Fruit {
             p.pos.y += vy + gravity.y;
         }
 
-        // Iterative constraint solving (Gauss-Seidel)
         for (let i = 0; i < 4; i++) {
             for (const s of this.springs) s.resolve();
         }
     }
 
-    /**
-     * Attempt to slice this fruit along the line segment (start → end).
-     * Any spring whose endpoints straddle the swipe line is destroyed.
-     * Returns true if at least one spring was cut.
-     */
     slice(start: Vector2, end: Vector2): boolean {
         let cut = false;
         for (let i = this.springs.length - 1; i >= 0; i--) {
@@ -109,7 +84,6 @@ export class Fruit {
 
         if (cut && !this.sliced) {
             this.sliced = true;
-            // Push the two halves apart along the swipe normal
             const mid = this.getCenterPos();
             const dir = end.sub(start);
             const len = dir.mag() || 1;
@@ -126,7 +100,6 @@ export class Fruit {
         return cut;
     }
 
-    /** Draw the fruit onto a canvas context. */
     draw(ctx: CanvasRenderingContext2D): void {
         const type = this.type;
         const center = this.getCenterPos();
@@ -139,7 +112,6 @@ export class Fruit {
         }
     }
 
-    /** Draw an intact fruit with skin gradient, highlight, shadow, and per-fruit details. */
     private drawWhole(ctx: CanvasRenderingContext2D, center: Vector2, r: number): void {
         const type = this.type;
         const perimeter = this.particles.slice(1);
@@ -147,7 +119,6 @@ export class Fruit {
 
         ctx.save();
 
-        // ── Drop shadow ──
         ctx.beginPath();
         this.traceSmoothOutline(ctx, perimeter);
         ctx.closePath();
@@ -159,7 +130,6 @@ export class Fruit {
         ctx.restore();
         ctx.filter = 'none';
 
-        // ── Skin fill with radial gradient ──
         ctx.beginPath();
         this.traceSmoothOutline(ctx, perimeter);
         ctx.closePath();
@@ -174,7 +144,6 @@ export class Fruit {
         ctx.fillStyle = skinGrad;
         ctx.fill();
 
-        // ── Per-fruit texture details ──
         ctx.save();
         ctx.beginPath();
         this.traceSmoothOutline(ctx, perimeter);
@@ -182,14 +151,12 @@ export class Fruit {
         ctx.clip();
 
         if (type.name === 'watermelon') {
-            // Dark green stripes
             ctx.strokeStyle = 'rgba(20, 100, 30, 0.35)';
             ctx.lineWidth = 4;
             for (let i = -3; i <= 3; i++) {
                 ctx.beginPath();
                 const offset = i * r * 0.28;
                 ctx.moveTo(center.x + offset, center.y - r * 1.2);
-                // Slight curve for organic feel
                 ctx.quadraticCurveTo(
                     center.x + offset + 4, center.y,
                     center.x + offset - 2, center.y + r * 1.2,
@@ -197,7 +164,6 @@ export class Fruit {
                 ctx.stroke();
             }
         } else if (type.name === 'orange') {
-            // Dimpled texture
             ctx.fillStyle = 'rgba(255,255,255,0.08)';
             for (let i = 0; i < 30; i++) {
                 const angle = (i / 30) * Math.PI * 2 + (i % 3) * 0.5;
@@ -209,7 +175,6 @@ export class Fruit {
                 ctx.fill();
             }
         } else if (type.name === 'apple') {
-            // Red-to-yellow gradient blush
             const blush = ctx.createRadialGradient(
                 center.x + r * 0.3, center.y + r * 0.4, 0,
                 center.x + r * 0.3, center.y + r * 0.4, r * 0.8,
@@ -219,7 +184,6 @@ export class Fruit {
             ctx.fillStyle = blush;
             ctx.fillRect(center.x - r, center.y - r, r * 2, r * 2);
         } else if (type.name === 'kiwi') {
-            // Fuzzy texture dots
             ctx.fillStyle = 'rgba(160, 120, 70, 0.2)';
             for (let i = 0; i < 40; i++) {
                 const angle = Math.random() * Math.PI * 2;
@@ -233,7 +197,6 @@ export class Fruit {
                 ctx.fill();
             }
         } else if (type.name === 'grape') {
-            // Subtle secondary sphere for 3D cluster look
             const grape2 = ctx.createRadialGradient(
                 center.x + r * 0.2, center.y - r * 0.15, r * 0.05,
                 center.x + r * 0.2, center.y - r * 0.15, r * 0.6,
@@ -245,7 +208,6 @@ export class Fruit {
         }
         ctx.restore();
 
-        // ── Specular highlight (top-left) ──
         ctx.beginPath();
         const hlX = center.x - r * 0.28;
         const hlY = center.y - r * 0.32;
@@ -257,7 +219,6 @@ export class Fruit {
         ctx.arc(hlX, hlY, r * 0.55, 0, Math.PI * 2);
         ctx.fill();
 
-        // ── Rim light (bottom edge) ──
         ctx.beginPath();
         const rimGrad = ctx.createRadialGradient(
             center.x, center.y + r * 0.6, 0,
@@ -269,7 +230,6 @@ export class Fruit {
         ctx.arc(center.x, center.y + r * 0.6, r * 0.6, 0, Math.PI * 2);
         ctx.fill();
 
-        // ── Stem for apple/lemon/orange ──
         if (type.name === 'apple' || type.name === 'orange' || type.name === 'lemon') {
             ctx.strokeStyle = '#5c3a1e';
             ctx.lineWidth = 2.5;
@@ -279,7 +239,6 @@ export class Fruit {
             ctx.quadraticCurveTo(center.x + 3, center.y - r * 1.15, center.x + 1, center.y - r * 1.2);
             ctx.stroke();
 
-            // Leaf for apple
             if (type.name === 'apple') {
                 ctx.fillStyle = '#3a8c2a';
                 ctx.beginPath();
@@ -291,13 +250,11 @@ export class Fruit {
         ctx.restore();
     }
 
-    /** Draw a sliced fruit showing cross-section with flesh, rind, seeds. */
     private drawSliced(ctx: CanvasRenderingContext2D, center: Vector2, r: number): void {
         const type = this.type;
 
         ctx.save();
 
-        // Draw each remaining spring segment as a thick rind-colored line
         ctx.strokeStyle = type.colorDark;
         ctx.lineWidth = 4;
         ctx.lineCap = 'round';
@@ -308,7 +265,6 @@ export class Fruit {
             ctx.stroke();
         }
 
-        // Draw each particle as a fleshy node with inner gradient
         for (const p of this.particles) {
             const nodeR = p === this.center ? 6 : 4;
             const grad = ctx.createRadialGradient(
@@ -323,7 +279,6 @@ export class Fruit {
             ctx.fill();
         }
 
-        // Seeds near center for watermelon/apple/kiwi/orange/lemon
         if (type.name === 'watermelon' || type.name === 'apple' ||
             type.name === 'kiwi' || type.name === 'orange' || type.name === 'lemon') {
             ctx.fillStyle = type.seedColor;
@@ -341,7 +296,6 @@ export class Fruit {
             }
         }
 
-        // Juice drip effect from center
         ctx.globalAlpha = 0.3;
         const dripGrad = ctx.createRadialGradient(
             this.center.pos.x, this.center.pos.y, 0,
@@ -358,10 +312,6 @@ export class Fruit {
         ctx.restore();
     }
 
-    /**
-     * Trace a smooth curve through the perimeter particles using
-     * Catmull-Rom → cubic Bezier conversion for organic shapes.
-     */
     private traceSmoothOutline(ctx: CanvasRenderingContext2D, perimeter: Particle[]): void {
         const n = perimeter.length;
         if (n < 3) {
@@ -370,7 +320,6 @@ export class Fruit {
             return;
         }
 
-        // Catmull-Rom spline through closed loop
         for (let i = 0; i < n; i++) {
             const p0 = perimeter[(i - 1 + n) % n].pos;
             const p1 = perimeter[i].pos;
@@ -379,7 +328,6 @@ export class Fruit {
 
             if (i === 0) ctx.moveTo(p1.x, p1.y);
 
-            // Convert Catmull-Rom to cubic Bezier control points
             const cp1x = p1.x + (p2.x - p0.x) / 6;
             const cp1y = p1.y + (p2.y - p0.y) / 6;
             const cp2x = p2.x - (p3.x - p1.x) / 6;

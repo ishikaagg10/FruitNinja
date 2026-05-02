@@ -11,14 +11,12 @@ export class PhysicsWorld {
 
     constructor(private width: number, private height: number) {}
 
-    // Creates a circular soft-body "Fruit"
     createFruit(cx: number, cy: number, radius: number, segments: number, stiffness: number) {
         const centerParticle = new Particle(cx, cy);
         this.particles.push(centerParticle);
 
         const startIndex = this.particles.length;
 
-        // Create perimeter particles
         for (let i = 0; i < segments; i++) {
             const angle = (i / segments) * Math.PI * 2;
             const px = cx + Math.cos(angle) * radius;
@@ -26,24 +24,20 @@ export class PhysicsWorld {
             this.particles.push(new Particle(px, py));
         }
 
-        // Connect springs
         for (let i = 0; i < segments; i++) {
             const current = startIndex + i;
             const next = startIndex + ((i + 1) % segments);
             
-            // Perimeter spring
             this.springs.push(new Spring(this.particles[current], this.particles[next], stiffness));
-            // Spoke spring (connects to center)
             this.springs.push(new Spring(this.particles[current], centerParticle, stiffness));
         }
     }
 
-    // Slicing: Removes springs intersected by the swipe line
     slice(start: Vector2, end: Vector2) {
         for (let i = this.springs.length - 1; i >= 0; i--) {
             const s = this.springs[i];
             if (Vector2.lineIntersect(start, end, s.p1.pos, s.p2.pos)) {
-                this.springs.splice(i, 1); // Cut the spring!
+                this.springs.splice(i, 1);
             }
         }
     }
@@ -61,11 +55,10 @@ export class PhysicsWorld {
             p.pos.x += vx + this.gravity.x;
             p.pos.y += vy + this.gravity.y;
 
-            // Floor collision
             if (p.pos.y > this.height - 10) {
                 p.pos.y = this.height - 10;
                 p.oldPos.y = p.pos.y + vy * this.bounce;
-                p.pos.x = p.oldPos.x + vx * 0.5; // Floor friction
+                p.pos.x = p.oldPos.x + vx * 0.5;
             }
         }
 

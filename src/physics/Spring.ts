@@ -11,7 +11,6 @@ export class Spring {
         const dist = this.p1.pos.dist(this.p2.pos);
         if (dist === 0) return;
 
-        // Hooke's Law approximation
         const difference = (this.restLength - dist) / dist;
         const offsetX = (this.p2.pos.x - this.p1.pos.x) * difference * 0.5 * this.stiffness;
         const offsetY = (this.p2.pos.y - this.p1.pos.y) * difference * 0.5 * this.stiffness;

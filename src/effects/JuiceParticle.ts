@@ -1,8 +1,3 @@
-/**
- * JuiceParticle: a small cosmetic particle emitted when a fruit is sliced.
- * Each particle has its own velocity, color, size, and lifetime.
- * These are purely visual and do not interact with the physics simulation.
- */
 export class JuiceParticle {
     public x: number;
     public y: number;
@@ -29,7 +24,7 @@ export class JuiceParticle {
     update(): void {
         this.x += this.vx;
         this.y += this.vy;
-        this.vy += 0.15; // gravity on particles
+        this.vy += 0.15;
         this.life -= this.decay;
     }
 

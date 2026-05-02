@@ -2,10 +2,6 @@ import { Particle } from "../physics/Particle";
 import { Spring } from "../physics/Spring";
 import { Vector2 } from "../math/Vector2";
 
-/**
- * A Bomb is a soft-body circle like a Fruit, but slicing it ends the game.
- * Visually rendered as a dark sphere with a fuse and danger markings.
- */
 export class Bomb {
     public particles: Particle[] = [];
     public springs: Spring[] = [];
@@ -64,7 +60,6 @@ export class Bomb {
         }
     }
 
-    /** Returns true if the swipe intersected any spring. */
     checkSlice(start: Vector2, end: Vector2): boolean {
         for (const s of this.springs) {
             if (Vector2.lineIntersect(start, end, s.p1.pos, s.p2.pos)) {
@@ -82,7 +77,6 @@ export class Bomb {
 
         ctx.save();
 
-        // Body — dark sphere
         const bodyGrad = ctx.createRadialGradient(
             center.x - r * 0.2, center.y - r * 0.25, r * 0.05,
             center.x, center.y, r * 1.05,
@@ -111,7 +105,6 @@ export class Bomb {
         ctx.fillStyle = bodyGrad;
         ctx.fill();
 
-        // Highlight
         ctx.beginPath();
         const hlX = center.x - r * 0.25;
         const hlY = center.y - r * 0.3;
@@ -122,7 +115,6 @@ export class Bomb {
         ctx.arc(hlX, hlY, r * 0.45, 0, Math.PI * 2);
         ctx.fill();
 
-        // Danger cross
         ctx.strokeStyle = '#ff3333';
         ctx.lineWidth = 3;
         ctx.lineCap = 'round';
@@ -134,7 +126,6 @@ export class Bomb {
         ctx.lineTo(center.x - sz, center.y + sz);
         ctx.stroke();
 
-        // Fuse
         ctx.strokeStyle = '#8B7355';
         ctx.lineWidth = 2.5;
         ctx.beginPath();
@@ -142,7 +133,6 @@ export class Bomb {
         ctx.quadraticCurveTo(center.x + 6, center.y - r * 1.3, center.x + 2, center.y - r * 1.4);
         ctx.stroke();
 
-        // Fuse spark (animated via time)
         const t = Date.now() * 0.008;
         const sparkAlpha = 0.5 + Math.sin(t) * 0.5;
         ctx.beginPath();

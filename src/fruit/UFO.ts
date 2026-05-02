@@ -1,13 +1,5 @@
 import { Vector2 } from "../math/Vector2";
 
-/**
- * UFO: A flying saucer that drifts across the screen horizontally.
- * If the player's blade touches it, it "abducts" the screen —
- * blocking all input and covering the view for 5 seconds.
- *
- * The UFO is drawn procedurally: a metallic disc with a glass dome,
- * animated lights underneath, and a tractor beam glow.
- */
 export class UFO {
     public x: number;
     public y: number;
@@ -19,7 +11,6 @@ export class UFO {
     private bobPhase: number;
 
     constructor(screenW: number, screenH: number) {
-        // Enter from left or right
         const fromLeft = Math.random() > 0.5;
         this.x = fromLeft ? -this.width : screenW + this.width;
         this.y = 60 + Math.random() * (screenH * 0.3);
@@ -31,18 +22,15 @@ export class UFO {
         this.x += this.vx;
         this.bobPhase += 0.04;
 
-        // Kill if off-screen on the opposite side
         if (this.vx > 0 && this.x > screenW + this.width + 20) this.alive = false;
         if (this.vx < 0 && this.x < -this.width - 20) this.alive = false;
     }
 
-    /** Get center for hit detection */
     getCenterPos(): Vector2 {
         const bobY = Math.sin(this.bobPhase) * 8;
         return new Vector2(this.x, this.y + bobY);
     }
 
-    /** Check if a swipe segment comes close to the UFO */
     checkHit(a: Vector2, b: Vector2): boolean {
         const center = this.getCenterPos();
         const d = this.pointToSegDist(center, a, b);
@@ -67,7 +55,6 @@ export class UFO {
 
         ctx.save();
 
-        // Tractor beam (subtle cone of light below)
         const beamGrad = ctx.createLinearGradient(cx, cy + 15, cx, cy + 120);
         beamGrad.addColorStop(0, `rgba(120,255,120,${0.08 + Math.sin(t) * 0.04})`);
         beamGrad.addColorStop(1, 'transparent');
@@ -80,7 +67,6 @@ export class UFO {
         ctx.closePath();
         ctx.fill();
 
-        // UFO body — bottom disc (metallic)
         const bodyGrad = ctx.createLinearGradient(cx, cy - 5, cx, cy + 18);
         bodyGrad.addColorStop(0, '#b0b0b8');
         bodyGrad.addColorStop(0.4, '#888890');
@@ -90,21 +76,18 @@ export class UFO {
         ctx.ellipse(cx, cy + 8, this.width * 0.5, 14, 0, 0, Math.PI * 2);
         ctx.fill();
 
-        // Rim highlight
         ctx.strokeStyle = 'rgba(200,200,210,0.5)';
         ctx.lineWidth = 1.5;
         ctx.beginPath();
         ctx.ellipse(cx, cy + 6, this.width * 0.5 - 2, 12, 0, Math.PI, Math.PI * 2);
         ctx.stroke();
 
-        // Animated lights along the bottom rim
         const lightCount = 8;
         for (let i = 0; i < lightCount; i++) {
             const angle = (i / lightCount) * Math.PI * 2 + t * 2;
             const lx = cx + Math.cos(angle) * (this.width * 0.38);
             const ly = cy + 8 + Math.sin(angle) * 8;
 
-            // Cycle through colors
             const hue = ((i / lightCount) * 360 + Date.now() * 0.2) % 360;
             const alpha = 0.6 + Math.sin(t * 3 + i) * 0.4;
 
@@ -113,14 +96,12 @@ export class UFO {
             ctx.arc(lx, ly, 3, 0, Math.PI * 2);
             ctx.fill();
 
-            // Light glow
             ctx.fillStyle = `hsla(${hue}, 100%, 70%, ${alpha * 0.3})`;
             ctx.beginPath();
             ctx.arc(lx, ly, 6, 0, Math.PI * 2);
             ctx.fill();
         }
 
-        // Glass dome on top
         const domeGrad = ctx.createRadialGradient(
             cx - 5, cy - 12, 2,
             cx, cy - 4, 22,
@@ -133,20 +114,17 @@ export class UFO {
         ctx.ellipse(cx, cy - 4, 22, 18, 0, Math.PI, Math.PI * 2);
         ctx.fill();
 
-        // Dome outline
         ctx.strokeStyle = 'rgba(150,200,230,0.5)';
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.ellipse(cx, cy - 4, 22, 18, 0, Math.PI, Math.PI * 2);
         ctx.stroke();
 
-        // Dome specular highlight
         ctx.fillStyle = 'rgba(255,255,255,0.4)';
         ctx.beginPath();
         ctx.ellipse(cx - 6, cy - 14, 6, 4, -0.3, 0, Math.PI * 2);
         ctx.fill();
 
-        // Alien eyes inside dome (two glowing dots)
         const eyeSpread = 6;
         const eyeY = cy - 8;
         ctx.fillStyle = `rgba(0,255,0,${0.6 + Math.sin(t * 2) * 0.3})`;
@@ -157,7 +135,6 @@ export class UFO {
         ctx.arc(cx + eyeSpread, eyeY, 2.5, 0, Math.PI * 2);
         ctx.fill();
 
-        // Eye glow
         ctx.fillStyle = `rgba(0,255,0,0.15)`;
         ctx.beginPath();
         ctx.arc(cx - eyeSpread, eyeY, 6, 0, Math.PI * 2);
@@ -169,31 +146,24 @@ export class UFO {
         ctx.restore();
     }
 
-    /**
-     * Draw the "abduction" screen takeover effect.
-     * Called when the UFO has been hit — covers the whole screen.
-     */
     static drawAbductionOverlay(
         ctx: CanvasRenderingContext2D,
         W: number, H: number,
-        progress: number, // 0..1 how far into the 5s we are
+        progress: number,
     ): void {
         const t = Date.now() * 0.003;
 
-        // Green-tinted overlay
         const intensity = progress < 0.1
-            ? progress / 0.1   // fade in
+            ? progress / 0.1
             : progress > 0.85
-            ? (1 - progress) / 0.15  // fade out
+            ? (1 - progress) / 0.15
             : 1;
 
         ctx.save();
 
-        // Dark green background
         ctx.fillStyle = `rgba(0, 15, 0, ${0.85 * intensity})`;
         ctx.fillRect(0, 0, W, H);
 
-        // Scanning beam lines sweeping down
         ctx.globalAlpha = 0.15 * intensity;
         for (let i = 0; i < 20; i++) {
             const lineY = ((t * 80 + i * (H / 20)) % (H + 40)) - 20;
@@ -205,7 +175,6 @@ export class UFO {
             ctx.fillRect(0, lineY - 3, W, 6);
         }
 
-        // Static noise
         ctx.globalAlpha = 0.06 * intensity;
         for (let i = 0; i < 300; i++) {
             const nx = Math.random() * W;
@@ -214,12 +183,10 @@ export class UFO {
             ctx.fillRect(nx, ny, 2, 2);
         }
 
-        // Central UFO silhouette
         ctx.globalAlpha = 0.4 * intensity;
         const ufoCx = W / 2 + Math.sin(t * 0.7) * 40;
         const ufoCy = H * 0.3 + Math.sin(t * 0.5) * 20;
 
-        // Tractor beam from center UFO
         const beamGrad = ctx.createLinearGradient(ufoCx, ufoCy + 20, ufoCx, H);
         beamGrad.addColorStop(0, `rgba(0,255,60,${0.25 * intensity})`);
         beamGrad.addColorStop(1, 'transparent');
@@ -232,7 +199,6 @@ export class UFO {
         ctx.closePath();
         ctx.fill();
 
-        // UFO shape
         ctx.globalAlpha = 0.6 * intensity;
         ctx.fillStyle = '#113311';
         ctx.beginPath();
@@ -243,7 +209,6 @@ export class UFO {
         ctx.ellipse(ufoCx, ufoCy - 2, 28, 22, 0, Math.PI, Math.PI * 2);
         ctx.fill();
 
-        // Glowing lights
         ctx.globalAlpha = intensity;
         for (let i = 0; i < 6; i++) {
             const angle = (i / 6) * Math.PI * 2 + t * 3;
@@ -256,7 +221,6 @@ export class UFO {
             ctx.fill();
         }
 
-        // Warning text
         ctx.globalAlpha = 0.7 * intensity * (0.5 + Math.sin(t * 4) * 0.5);
         ctx.fillStyle = '#00ff44';
         ctx.font = 'bold 36px monospace';

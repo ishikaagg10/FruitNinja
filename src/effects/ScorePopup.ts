@@ -1,7 +1,3 @@
-/**
- * ScorePopup: a floating "+N" text that drifts upward and fades out
- * at the point where a fruit was sliced.
- */
 export class ScorePopup {
     public life: number = 1;
     private decay: number = 0.02;

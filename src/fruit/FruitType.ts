@@ -1,14 +1,9 @@
 export interface FruitType {
     name: string;
-    /** Outer skin / rind color */
     color: string;
-    /** Darker shade for gradient on skin */
     colorDark: string;
-    /** Inner flesh color */
     innerColor: string;
-    /** Lighter flesh highlight */
     innerLight: string;
-    /** Seed / detail color */
     seedColor: string;
     radius: number;
     segments: number;

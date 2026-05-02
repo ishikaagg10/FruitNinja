@@ -12,18 +12,7 @@ import { FruitSpawner } from "./FruitSpawner";
 
 type GameState = 'start' | 'playing' | 'over';
 
-/**
- * Game orchestrates the full Fruit Ninja experience:
- *  - State machine (start → playing → over)
- *  - Spawning fruits on parabolic arcs from the bottom of the screen
- *  - Bombs that end the game if sliced
- *  - 60-second countdown timer
- *  - Detecting swipe input and slicing soft-body fruits
- *  - Scoring, miss tracking, and difficulty scaling
- *  - Rendering all objects and visual effects
- */
 export class Game {
-    // Canvas
     private canvas: HTMLCanvasElement;
     private ctx: CanvasRenderingContext2D;
     private bladeCanvas: HTMLCanvasElement;
@@ -31,15 +20,13 @@ export class Game {
     private W = 0;
     private H = 0;
 
-    // State
     private state: GameState = 'start';
     private score = 0;
     private gameStartTime = 0;
-    private readonly GAME_DURATION = 60; // seconds
+    private readonly GAME_DURATION = 60;
     private timeRemaining = 60;
     private gameOverReason = '';
 
-    // Objects
     private fruits: Fruit[] = [];
     private bombs: Bomb[] = [];
     private bananas: SpecialBanana[] = [];
@@ -50,21 +37,17 @@ export class Game {
     private bladeTrail = new BladeTrail();
     private spawner = new FruitSpawner();
 
-    // Active powerups
-    private freezeUntil = 0;       // timestamp when freeze ends
-    private doubleUntil = 0;       // timestamp when double points ends
-    private frenzyQueued = false;   // triggers a burst of fruits next frame
-    private abductedUntil = 0;     // timestamp when abduction ends
+    private freezeUntil = 0;
+    private doubleUntil = 0;
+    private frenzyQueued = false;
+    private abductedUntil = 0;
 
-    // Physics constants — low gravity for big floaty arcs
     private gravity = new Vector2(0, 0.12);
     private friction = 0.995;
 
-    // Input
     private isSwiping = false;
     private swipePrev: Vector2 | null = null;
 
-    // DOM
     private scoreEl: HTMLElement;
     private uiEl: HTMLElement;
     private startScreen: HTMLElement;
@@ -99,9 +82,6 @@ export class Game {
         this.bladeCanvas.width = this.W;
         this.bladeCanvas.height = this.H;
     }
-
-    // ── Input ──────────────────────────────────────────────
-
     private bindInput(): void {
         const handler = (type: 'down' | 'move' | 'up', e: PointerEvent) => {
             e.preventDefault();
@@ -130,7 +110,6 @@ export class Game {
 
     private onPointerMove(x: number, y: number): void {
         if (!this.isSwiping || this.state !== 'playing') return;
-        // Block slicing during abduction
         if (Date.now() < this.abductedUntil) {
             this.bladeTrail.add(x, y);
             this.swipePrev = new Vector2(x, y);
@@ -139,15 +118,12 @@ export class Game {
         const cur = new Vector2(x, y);
         this.bladeTrail.add(x, y);
 
-        // Interpolate the swipe into small sub-segments so fast swipes
-        // don't skip over fruits. Max step length ~15px.
         const prev = this.swipePrev!;
         const dx = cur.x - prev.x;
         const dy = cur.y - prev.y;
         const dist = Math.hypot(dx, dy);
         const steps = Math.max(1, Math.ceil(dist / 15));
 
-        // Track fruits cut in this single move event for combo
         const cutThisMove: { fruit: Fruit; pos: Vector2 }[] = [];
 
         for (let s = 0; s < steps; s++) {
@@ -156,14 +132,12 @@ export class Game {
             const a = new Vector2(prev.x + dx * t0, prev.y + dy * t0);
             const b = new Vector2(prev.x + dx * t1, prev.y + dy * t1);
 
-            // Check UFOs — touching one triggers abduction
             for (const ufo of this.ufos) {
                 if (!ufo.alive || ufo.hit) continue;
                 if (ufo.checkHit(a, b)) {
                     ufo.hit = true;
                     ufo.alive = false;
                     this.abductedUntil = Date.now() + 5000;
-                    // Also push gameStartTime back so abduction doesn't eat the timer
                     this.gameStartTime += 5000;
                     const c = ufo.getCenterPos();
                     this.scorePopups.push(new ScorePopup(c.x, c.y, 'ABDUCTED!', '#00ff44'));
@@ -174,11 +148,10 @@ export class Game {
                         this.juiceParticles.push(new JuiceParticle(c.x, c.y, '#88ffaa'));
                     }
                     this.swipePrev = cur;
-                    return; // stop processing this swipe
+                    return;
                 }
             }
 
-            // Check bombs first
             for (const bomb of this.bombs) {
                 if (!bomb.alive || bomb.sliced) continue;
                 if (this.checkSliceOrProximity(bomb, a, b, bomb.radius)) {
@@ -197,14 +170,12 @@ export class Game {
                 }
             }
 
-            // Check bananas (powerups)
             for (const banana of this.bananas) {
                 if (!banana.alive || banana.sliced) continue;
                 if (banana.checkSlice(a, b)) {
                     banana.alive = false;
                     const c = banana.getCenterPos();
 
-                    // Big sparkle burst in banana's color
                     for (let i = 0; i < 25; i++) {
                         this.juiceParticles.push(new JuiceParticle(c.x, c.y, banana.config.innerColor));
                     }
@@ -213,22 +184,20 @@ export class Game {
                     }
                     this.splashMarks.push(new SplashMark(c.x, c.y, banana.config.color, 45));
 
-                    // Activate powerup
                     const now = Date.now();
                     if (banana.bananaType === 'frenzy') {
                         this.frenzyQueued = true;
                         this.scorePopups.push(new ScorePopup(c.x, c.y, 'FRENZY!', '#88bbff'));
                     } else if (banana.bananaType === 'freeze') {
-                        this.freezeUntil = now + 5000; // 5 seconds
+                        this.freezeUntil = now + 5000;
                         this.scorePopups.push(new ScorePopup(c.x, c.y, 'TIME FREEZE!', '#ccf4ff'));
                     } else if (banana.bananaType === 'double') {
-                        this.doubleUntil = now + 8000; // 8 seconds
+                        this.doubleUntil = now + 8000;
                         this.scorePopups.push(new ScorePopup(c.x, c.y, 'DOUBLE POINTS!', '#bbffbb'));
                     }
                 }
             }
 
-            // Check fruits
             for (const fruit of this.fruits) {
                 if (!fruit.alive || fruit.scored) continue;
                 const wasCut = this.checkSliceOrProximity(fruit, a, b, fruit.type.radius);
@@ -240,7 +209,6 @@ export class Game {
                     const c = fruit.getCenterPos();
                     cutThisMove.push({ fruit, pos: c });
 
-                    // Juice burst
                     for (let i = 0; i < 18; i++) {
                         this.juiceParticles.push(new JuiceParticle(c.x, c.y, fruit.type.innerColor));
                     }
@@ -248,7 +216,6 @@ export class Game {
                         this.juiceParticles.push(new JuiceParticle(c.x, c.y, fruit.type.color));
                     }
 
-                    // Splash mark on the cutting board
                     this.splashMarks.push(new SplashMark(
                         c.x, c.y, fruit.type.innerColor, fruit.type.radius,
                     ));
@@ -256,7 +223,6 @@ export class Game {
             }
         }
 
-        // Score with combo bonus
         if (cutThisMove.length > 0) {
             const comboCount = cutThisMove.length;
             const isCombo = comboCount >= 2;
@@ -272,11 +238,9 @@ export class Game {
                 );
             }
 
-            // Extra combo banner + bonus points
             if (isCombo) {
                 const bonusPts = comboCount * 3;
                 this.score += bonusPts;
-                // Show combo popup near the midpoint of all cut fruits
                 const midX = cutThisMove.reduce((s, c) => s + c.pos.x, 0) / comboCount;
                 const midY = cutThisMove.reduce((s, c) => s + c.pos.y, 0) / comboCount;
                 this.scorePopups.push(
@@ -291,25 +255,18 @@ export class Game {
         this.swipePrev = cur;
     }
 
-    /**
-     * Checks if the swipe segment (a→b) hits the object, using both
-     * spring-intersection AND proximity to the center as a fallback.
-     * This ensures fast swipes that pass through the fruit still register.
-     */
     private checkSliceOrProximity(
         obj: { springs: { p1: { pos: Vector2 }; p2: { pos: Vector2 } }[]; getCenterPos(): Vector2 },
         a: Vector2,
         b: Vector2,
         radius: number,
     ): boolean {
-        // Method 1: spring intersection (original)
         for (const s of obj.springs) {
             if (Vector2.lineIntersect(a, b, s.p1.pos, s.p2.pos)) {
                 return true;
             }
         }
 
-        // Method 2: proximity — does the swipe line pass close to center?
         const center = obj.getCenterPos();
         const d = this.pointToSegmentDist(center, a, b);
         if (d < radius * 0.85) {
@@ -319,7 +276,6 @@ export class Game {
         return false;
     }
 
-    /** Distance from point P to line segment AB. */
     private pointToSegmentDist(p: Vector2, a: Vector2, b: Vector2): number {
         const abx = b.x - a.x;
         const aby = b.y - a.y;
@@ -338,9 +294,6 @@ export class Game {
         this.isSwiping = false;
         this.swipePrev = null;
     }
-
-    // ── State transitions ─────────────────────────────────
-
     private startGame(): void {
         this.score = 0;
         this.fruits = [];
@@ -382,29 +335,23 @@ export class Game {
 
         this.gameOverScreen.classList.remove('hidden');
     }
-
-    // ── Update ─────────────────────────────────────────────
-
     private update(): void {
         if (this.state !== 'playing') return;
 
         const now = Date.now();
         const isFrozen = now < this.freezeUntil;
 
-        // Timer — paused during freeze
         if (!isFrozen) {
             const elapsed = (now - this.gameStartTime) / 1000;
             this.timeRemaining = Math.max(0, this.GAME_DURATION - elapsed);
         } else {
-            // Push start time forward so freeze doesn't eat game time
-            this.gameStartTime += 1000 / 60; // ~1 frame worth
+            this.gameStartTime += 1000 / 60;
         }
 
         const mins = Math.floor(this.timeRemaining / 60);
         const secs = Math.ceil(this.timeRemaining % 60);
         this.timerEl.textContent = `${mins}:${secs < 10 ? '0' : ''}${secs}`;
 
-        // Timer color: frozen = ice blue, low = red, normal = white
         if (isFrozen) {
             this.timerEl.style.color = '#66ddff';
         } else if (this.timeRemaining <= 10) {
@@ -419,7 +366,6 @@ export class Game {
             return;
         }
 
-        // Frenzy burst — 100 fruits from all directions at once
         if (this.frenzyQueued) {
             this.frenzyQueued = false;
 
@@ -429,25 +375,21 @@ export class Game {
                 let x: number, y: number, vx: number, vy: number;
 
                 if (side < 0.35) {
-                    // Bottom
                     x = Math.random() * this.W;
                     y = this.H + type.radius + Math.random() * 60;
                     vx = (Math.random() - 0.5) * 7;
                     vy = -(7 + Math.random() * 7);
                 } else if (side < 0.55) {
-                    // Top
                     x = Math.random() * this.W;
                     y = -type.radius - Math.random() * 60;
                     vx = (Math.random() - 0.5) * 5;
                     vy = 2 + Math.random() * 4;
                 } else if (side < 0.775) {
-                    // Left
                     x = -type.radius - Math.random() * 60;
                     y = Math.random() * this.H * 0.7;
                     vx = 4 + Math.random() * 6;
                     vy = (Math.random() - 0.5) * 6;
                 } else {
-                    // Right
                     x = this.W + type.radius + Math.random() * 60;
                     y = Math.random() * this.H * 0.7;
                     vx = -(4 + Math.random() * 6);
@@ -458,14 +400,12 @@ export class Game {
             }
         }
 
-        // Spawn new fruits, bombs, bananas, and UFOs
         const spawned = this.spawner.update(this.W, this.H, this.score);
         this.fruits.push(...spawned.fruits);
         this.bombs.push(...spawned.bombs);
         this.bananas.push(...spawned.bananas);
         this.ufos.push(...spawned.ufos);
 
-        // Update fruits
         for (const fruit of this.fruits) {
             if (!fruit.alive) continue;
             fruit.update(this.gravity, this.friction);
@@ -473,7 +413,6 @@ export class Game {
             if (c.y > this.H + 150) fruit.alive = false;
         }
 
-        // Update bombs
         for (const bomb of this.bombs) {
             if (!bomb.alive) continue;
             bomb.update(this.gravity, this.friction);
@@ -481,7 +420,6 @@ export class Game {
             if (c.y > this.H + 150) bomb.alive = false;
         }
 
-        // Update bananas
         for (const banana of this.bananas) {
             if (!banana.alive) continue;
             banana.update(this.gravity, this.friction);
@@ -489,13 +427,11 @@ export class Game {
             if (c.y > this.H + 150) banana.alive = false;
         }
 
-        // Update UFOs (they move horizontally, not affected by gravity)
         for (const ufo of this.ufos) {
             if (!ufo.alive) continue;
             ufo.update(this.W);
         }
 
-        // Clean up
         this.fruits = this.fruits.filter(
             f => f.alive || f.getCenterPos().y < this.H + 300,
         );
@@ -505,7 +441,6 @@ export class Game {
         this.bananas = this.bananas.filter(b => b.alive);
         this.ufos = this.ufos.filter(u => u.alive);
 
-        // Effects
         for (const j of this.juiceParticles) j.update();
         this.juiceParticles = this.juiceParticles.filter(j => !j.dead);
 
@@ -518,16 +453,10 @@ export class Game {
         this.bladeTrail.update();
     }
 
-    // Cached wood background — generated once, redrawn from cache
     private bgCanvas: HTMLCanvasElement | null = null;
     private bgW = 0;
     private bgH = 0;
 
-    /**
-     * Generate a procedural dark wood cutting board texture matching
-     * the classic Fruit Ninja look: vertical planks, deep brown color,
-     * scratch/slice marks, knots, nail holes, heavy vignette.
-     */
     private ensureBg(): void {
         if (this.bgCanvas && this.bgW === this.W && this.bgH === this.H) return;
 
@@ -541,30 +470,25 @@ export class Game {
         const W = this.W;
         const H = this.H;
 
-        // Use a seeded random so the bg is consistent
         const rand = (seed: number) => {
             const x = Math.sin(seed * 127.1 + 311.7) * 43758.5453;
             return x - Math.floor(x);
         };
 
-        // ── Base dark brown fill ──
         bx.fillStyle = '#4a3020';
         bx.fillRect(0, 0, W, H);
 
-        // ── Vertical planks ──
         const plankCount = 4 + Math.floor(W / 350);
         const plankW = W / plankCount;
 
         for (let p = 0; p < plankCount; p++) {
             const px = p * plankW;
 
-            // Each plank has a slightly different base hue
             const hueShift = rand(p * 7) * 15 - 7;
             const r = Math.round(74 + hueShift);
             const g = Math.round(48 + hueShift * 0.6);
             const b = Math.round(32 + hueShift * 0.4);
 
-            // Plank base with vertical gradient variation
             const plankGrad = bx.createLinearGradient(px, 0, px, H);
             plankGrad.addColorStop(0, `rgb(${r - 5},${g - 3},${b - 2})`);
             plankGrad.addColorStop(0.3, `rgb(${r + 8},${g + 5},${b + 3})`);
@@ -573,7 +497,6 @@ export class Game {
             bx.fillStyle = plankGrad;
             bx.fillRect(px, 0, plankW, H);
 
-            // Vertical wood grain
             bx.globalAlpha = 0.08;
             for (let j = 0; j < 25; j++) {
                 const gx = px + rand(p * 100 + j) * plankW;
@@ -590,7 +513,6 @@ export class Game {
             }
             bx.globalAlpha = 1;
 
-            // Plank seam — dark gap + light edge
             if (p > 0) {
                 bx.strokeStyle = '#1a0e05';
                 bx.lineWidth = 2.5;
@@ -608,14 +530,12 @@ export class Game {
             }
         }
 
-        // ── Knots (2-4 darker ovals with rings) ──
         const knotCount = 2 + Math.floor(rand(42) * 3);
         for (let i = 0; i < knotCount; i++) {
             const kx = rand(i * 17 + 5) * W;
             const ky = rand(i * 23 + 11) * H;
             const kr = 12 + rand(i * 7) * 22;
 
-            // Knot body
             bx.globalAlpha = 0.3;
             const knotGrad = bx.createRadialGradient(kx, ky, 0, kx, ky, kr);
             knotGrad.addColorStop(0, '#1a0e05');
@@ -626,7 +546,6 @@ export class Game {
             bx.ellipse(kx, ky, kr, kr * 0.7, rand(i) * 0.5, 0, Math.PI * 2);
             bx.fill();
 
-            // Knot rings
             bx.globalAlpha = 0.1;
             bx.strokeStyle = '#3a2510';
             bx.lineWidth = 1;
@@ -639,31 +558,27 @@ export class Game {
             bx.globalAlpha = 1;
         }
 
-        // ── Scratch / slice marks ──
         const scratchCount = 5 + Math.floor(rand(99) * 6);
         for (let i = 0; i < scratchCount; i++) {
             const sx = rand(i * 13 + 3) * W;
             const sy = rand(i * 19 + 7) * H;
-            const angle = rand(i * 31) * Math.PI - Math.PI / 2; // mostly vertical-ish
+            const angle = rand(i * 31) * Math.PI - Math.PI / 2;
             const len = 30 + rand(i * 41) * 100;
 
             bx.save();
             bx.translate(sx, sy);
             bx.rotate(angle);
 
-            // Dark scratch line
             bx.globalAlpha = 0.15 + rand(i * 53) * 0.15;
             bx.strokeStyle = '#1a0a02';
             bx.lineWidth = 1 + rand(i * 61) * 1.5;
             bx.lineCap = 'round';
             bx.beginPath();
             bx.moveTo(0, -len / 2);
-            // Slightly curved scratch
             const curve = (rand(i * 71) - 0.5) * 20;
             bx.quadraticCurveTo(curve, 0, 0, len / 2);
             bx.stroke();
 
-            // Light edge next to scratch (raised wood)
             bx.globalAlpha = 0.06;
             bx.strokeStyle = '#8a7050';
             bx.lineWidth = 0.5;
@@ -675,10 +590,8 @@ export class Game {
             bx.restore();
         }
 
-        // ── Nail holes (small dark circles on plank edges) ──
         for (let p = 0; p < plankCount; p++) {
             const px = p * plankW;
-            // Top and bottom nails
             for (const ny of [25, H - 25]) {
                 const nx = px + plankW - 15 + rand(p * 5 + ny) * 8;
                 bx.globalAlpha = 0.4;
@@ -686,7 +599,6 @@ export class Game {
                 bx.beginPath();
                 bx.arc(nx, ny, 2.5, 0, Math.PI * 2);
                 bx.fill();
-                // Tiny highlight
                 bx.globalAlpha = 0.1;
                 bx.fillStyle = '#6a5535';
                 bx.beginPath();
@@ -695,14 +607,12 @@ export class Game {
             }
         }
 
-        // ── Noise grain ──
         bx.globalAlpha = 0.03;
         for (let i = 0; i < 12000; i++) {
             bx.fillStyle = rand(i) > 0.5 ? '#000' : '#8a7050';
             bx.fillRect(rand(i * 3) * W, rand(i * 7) * H, 1, 1);
         }
 
-        // ── Heavy vignette ──
         bx.globalAlpha = 1;
         const vig = bx.createRadialGradient(
             W / 2, H / 2, Math.min(W, H) * 0.2,
@@ -721,40 +631,33 @@ export class Game {
         const ctx = this.ctx;
         ctx.clearRect(0, 0, this.W, this.H);
 
-        // Wood cutting board background (cached)
         this.ensureBg();
         if (this.bgCanvas) {
             ctx.drawImage(this.bgCanvas, 0, 0);
         }
 
-        // Splash marks (juice stains on the board, behind fruits)
         for (const sp of this.splashMarks) sp.draw(ctx);
 
-        // Fruits
         for (const fruit of this.fruits) {
             if (!fruit.alive && fruit.getCenterPos().y > this.H + 100) continue;
             fruit.draw(ctx);
         }
 
-        // Bombs
         for (const bomb of this.bombs) {
             if (!bomb.alive) continue;
             bomb.draw(ctx);
         }
 
-        // Special bananas
         for (const banana of this.bananas) {
             if (!banana.alive) continue;
             banana.draw(ctx);
         }
 
-        // UFOs
         for (const ufo of this.ufos) {
             if (!ufo.alive) continue;
             ufo.draw(ctx);
         }
 
-        // Active powerup indicators
         const now = Date.now();
         let indicatorY = 60;
         ctx.font = 'bold 16px sans-serif';
@@ -775,13 +678,10 @@ export class Game {
             ctx.globalAlpha = 1;
         }
 
-        // Juice particles
         for (const j of this.juiceParticles) j.draw(ctx);
 
-        // Score popups
         for (const s of this.scorePopups) s.draw(ctx);
 
-        // Abduction overlay (drawn on top of everything)
         if (now < this.abductedUntil) {
             const total = 5000;
             const elapsed = total - (this.abductedUntil - now);
@@ -789,13 +689,9 @@ export class Game {
             UFO.drawAbductionOverlay(ctx, this.W, this.H, progress);
         }
 
-        // Blade trail (on overlay canvas)
         this.bctx.clearRect(0, 0, this.W, this.H);
         this.bladeTrail.draw(this.bctx);
     }
-
-    // ── Main loop ──────────────────────────────────────────
-
     private loop = (): void => {
         this.update();
         this.draw();
