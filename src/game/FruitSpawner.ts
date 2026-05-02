@@ -1,16 +1,20 @@
 import { Fruit } from "../fruit/Fruit";
 import { Bomb } from "../fruit/Bomb";
 import { SpecialBanana, type BananaType } from "../fruit/SpecialBanana";
+import { UFO } from "../fruit/UFO";
 import { FRUIT_TYPES } from "../fruit/FruitType";
 
 /**
  * FruitSpawner manages the timing and creation of new fruits, bombs,
- * and special banana powerups.
+ * special banana powerups, and the UFO hazard.
  *
  * Special bananas:
  *  - Each game, 1 or 2 (never all 3) banana types are selected
  *  - Each selected type spawns exactly once at a random time
  *  - They are spaced apart so they don't overlap
+ *
+ * UFO:
+ *  - Spawns once per game at a random time
  */
 export class FruitSpawner {
     private timer = 0;
@@ -18,9 +22,13 @@ export class FruitSpawner {
     private pendingBombs: number[] = [];
     private frameCount = 0;
 
-    // Banana scheduling: frame numbers at which to spawn each banana
+    // Banana scheduling
     private bananaSchedule: { type: BananaType; frame: number }[] = [];
     private bananasSpawned = new Set<BananaType>();
+
+    // UFO scheduling — once per game
+    private ufoFrame = 0;
+    private ufoSpawned = false;
 
     /** How many frames between waves. Decreases as difficulty rises. */
     getInterval(difficulty: number): number {
@@ -28,18 +36,19 @@ export class FruitSpawner {
     }
 
     /**
-     * Called once per frame. Returns newly-spawned fruits, bombs, and bananas.
+     * Called once per frame. Returns newly-spawned fruits, bombs, bananas, and UFOs.
      */
     update(
         screenW: number,
         screenH: number,
         score: number,
-    ): { fruits: Fruit[]; bombs: Bomb[]; bananas: SpecialBanana[] } {
+    ): { fruits: Fruit[]; bombs: Bomb[]; bananas: SpecialBanana[]; ufos: UFO[] } {
         const difficulty = 1 + Math.floor(score / 8);
         const interval = this.getInterval(difficulty);
         const fruits: Fruit[] = [];
         const bombs: Bomb[] = [];
         const bananas: SpecialBanana[] = [];
+        const ufos: UFO[] = [];
 
         this.frameCount++;
 
@@ -69,6 +78,12 @@ export class FruitSpawner {
             }
         }
 
+        // Check UFO schedule
+        if (this.frameCount >= this.ufoFrame && !this.ufoSpawned) {
+            this.ufoSpawned = true;
+            ufos.push(new UFO(screenW, screenH));
+        }
+
         this.timer++;
         if (this.timer >= interval) {
             this.timer = 0;
@@ -85,7 +100,7 @@ export class FruitSpawner {
             }
         }
 
-        return { fruits, bombs, bananas };
+        return { fruits, bombs, bananas, ufos };
     }
 
     private createFruit(screenW: number, screenH: number): Fruit {
@@ -148,5 +163,9 @@ export class FruitSpawner {
             this.bananaSchedule.push({ type: chosen[0], frame: frame1 });
             this.bananaSchedule.push({ type: chosen[1], frame: frame2 });
         }
+
+        // Schedule UFO — once per game, somewhere between 20-50s
+        this.ufoSpawned = false;
+        this.ufoFrame = Math.floor(1200 + Math.random() * 1800);
     }
 }

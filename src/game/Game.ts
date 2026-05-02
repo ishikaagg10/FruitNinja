@@ -3,6 +3,7 @@ import { Fruit } from "../fruit/Fruit";
 import { FRUIT_TYPES } from "../fruit/FruitType";
 import { Bomb } from "../fruit/Bomb";
 import { SpecialBanana } from "../fruit/SpecialBanana";
+import { UFO } from "../fruit/UFO";
 import { JuiceParticle } from "../effects/JuiceParticle";
 import { ScorePopup } from "../effects/ScorePopup";
 import { SplashMark } from "../effects/SplashMark";
@@ -42,6 +43,7 @@ export class Game {
     private fruits: Fruit[] = [];
     private bombs: Bomb[] = [];
     private bananas: SpecialBanana[] = [];
+    private ufos: UFO[] = [];
     private juiceParticles: JuiceParticle[] = [];
     private scorePopups: ScorePopup[] = [];
     private splashMarks: SplashMark[] = [];
@@ -52,6 +54,7 @@ export class Game {
     private freezeUntil = 0;       // timestamp when freeze ends
     private doubleUntil = 0;       // timestamp when double points ends
     private frenzyQueued = false;   // triggers a burst of fruits next frame
+    private abductedUntil = 0;     // timestamp when abduction ends
 
     // Physics constants — low gravity for big floaty arcs
     private gravity = new Vector2(0, 0.12);
@@ -127,6 +130,12 @@ export class Game {
 
     private onPointerMove(x: number, y: number): void {
         if (!this.isSwiping || this.state !== 'playing') return;
+        // Block slicing during abduction
+        if (Date.now() < this.abductedUntil) {
+            this.bladeTrail.add(x, y);
+            this.swipePrev = new Vector2(x, y);
+            return;
+        }
         const cur = new Vector2(x, y);
         this.bladeTrail.add(x, y);
 
@@ -146,6 +155,28 @@ export class Game {
             const t1 = (s + 1) / steps;
             const a = new Vector2(prev.x + dx * t0, prev.y + dy * t0);
             const b = new Vector2(prev.x + dx * t1, prev.y + dy * t1);
+
+            // Check UFOs — touching one triggers abduction
+            for (const ufo of this.ufos) {
+                if (!ufo.alive || ufo.hit) continue;
+                if (ufo.checkHit(a, b)) {
+                    ufo.hit = true;
+                    ufo.alive = false;
+                    this.abductedUntil = Date.now() + 5000;
+                    // Also push gameStartTime back so abduction doesn't eat the timer
+                    this.gameStartTime += 5000;
+                    const c = ufo.getCenterPos();
+                    this.scorePopups.push(new ScorePopup(c.x, c.y, 'ABDUCTED!', '#00ff44'));
+                    for (let i = 0; i < 20; i++) {
+                        this.juiceParticles.push(new JuiceParticle(c.x, c.y, '#00ff44'));
+                    }
+                    for (let i = 0; i < 15; i++) {
+                        this.juiceParticles.push(new JuiceParticle(c.x, c.y, '#88ffaa'));
+                    }
+                    this.swipePrev = cur;
+                    return; // stop processing this swipe
+                }
+            }
 
             // Check bombs first
             for (const bomb of this.bombs) {
@@ -315,12 +346,14 @@ export class Game {
         this.fruits = [];
         this.bombs = [];
         this.bananas = [];
+        this.ufos = [];
         this.juiceParticles = [];
         this.scorePopups = [];
         this.splashMarks = [];
         this.freezeUntil = 0;
         this.doubleUntil = 0;
         this.frenzyQueued = false;
+        this.abductedUntil = 0;
         this.spawner.reset();
         this.gameStartTime = Date.now();
         this.timeRemaining = this.GAME_DURATION;
@@ -425,11 +458,12 @@ export class Game {
             }
         }
 
-        // Spawn new fruits, bombs, and bananas
+        // Spawn new fruits, bombs, bananas, and UFOs
         const spawned = this.spawner.update(this.W, this.H, this.score);
         this.fruits.push(...spawned.fruits);
         this.bombs.push(...spawned.bombs);
         this.bananas.push(...spawned.bananas);
+        this.ufos.push(...spawned.ufos);
 
         // Update fruits
         for (const fruit of this.fruits) {
@@ -455,6 +489,12 @@ export class Game {
             if (c.y > this.H + 150) banana.alive = false;
         }
 
+        // Update UFOs (they move horizontally, not affected by gravity)
+        for (const ufo of this.ufos) {
+            if (!ufo.alive) continue;
+            ufo.update(this.W);
+        }
+
         // Clean up
         this.fruits = this.fruits.filter(
             f => f.alive || f.getCenterPos().y < this.H + 300,
@@ -463,6 +503,7 @@ export class Game {
             b => b.alive || b.getCenterPos().y < this.H + 300,
         );
         this.bananas = this.bananas.filter(b => b.alive);
+        this.ufos = this.ufos.filter(u => u.alive);
 
         // Effects
         for (const j of this.juiceParticles) j.update();
@@ -707,6 +748,12 @@ export class Game {
             banana.draw(ctx);
         }
 
+        // UFOs
+        for (const ufo of this.ufos) {
+            if (!ufo.alive) continue;
+            ufo.draw(ctx);
+        }
+
         // Active powerup indicators
         const now = Date.now();
         let indicatorY = 60;
@@ -733,6 +780,14 @@ export class Game {
 
         // Score popups
         for (const s of this.scorePopups) s.draw(ctx);
+
+        // Abduction overlay (drawn on top of everything)
+        if (now < this.abductedUntil) {
+            const total = 5000;
+            const elapsed = total - (this.abductedUntil - now);
+            const progress = elapsed / total;
+            UFO.drawAbductionOverlay(ctx, this.W, this.H, progress);
+        }
 
         // Blade trail (on overlay canvas)
         this.bctx.clearRect(0, 0, this.W, this.H);
